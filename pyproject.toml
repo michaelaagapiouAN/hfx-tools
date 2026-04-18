@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hfx-tools"
+version = "0.1.0"
+description = "Tools for building, inspecting, and QC'ing HFX submissions"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+parquet = ["pandas>=2.0", "pyarrow>=14.0"]
+streamlit = ["streamlit>=1.0"]
+
+[project.scripts]
+hfx-pack = "hfx_tools.cli:main"
+hfx-qc = "hfx_tools.cli:main"
+hfx-inspect = "hfx_tools.cli:main"
+hfx-build = "hfx_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hfx_tools*"]
+
+
+[dependency-groups]
+# uv dependency groups (install via `uv sync`; include all groups by default)
+dev = [
+  "pytest>=8.0",
+]
+lint = [
+  "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Reasonable defaults; tweak as you like
+select = ["E", "F", "I", "B", "UP"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["hfx_tools"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-q"
+testpaths = ["tests"]
+

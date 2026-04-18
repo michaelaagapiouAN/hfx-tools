@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Optional but recommended: use GitHub's cached Python for speed
+      # Uses your project's pinned version if you have one (e.g., .python-version),
+      # or you can point at pyproject.toml as shown here.
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Run CI via Makefile
+        run: make ci FROZEN=1
+
