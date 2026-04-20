@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
 from .io import read_hfx_json, write_hfx_json, load_frequency_rows, parse_frequency_location
-from .util import md5_hex, flatten_index_row
+from .util import flatten_index_row
 
 
 def _shannon_entropy(freqs: List[float]) -> float:
@@ -85,10 +85,6 @@ def qc_hfx(metadata_json: Path, write_metadata: bool, index_row: bool, topk: Lis
     md = hfx.get("metadata", {})
     freq_loc = md.get("frequencyLocation")
     kind, rel = parse_frequency_location(freq_loc)
-
-    if kind == "file" and rel is not None:
-        freq_file = (metadata_json.parent / rel).resolve()
-        md["checkSum"] = md5_hex(freq_file)
 
     if write_metadata:
         # Store QC at top-level (not under metadata, which has additionalProperties: false)

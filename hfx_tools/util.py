@@ -13,10 +13,6 @@ def file_hash(path: Path, alg: str) -> str:
     return h.hexdigest()
 
 
-def md5_hex(path: Path) -> str:
-    return file_hash(path, "md5")
-
-
 def safe_relpath(path_str: str) -> str:
     # prevent absolute paths or traversal
     p = Path(path_str)
@@ -56,8 +52,8 @@ def flatten_index_row(hfx: Dict[str, Any], qc: Dict[str, Any]) -> Dict[str, Any]
         "nomenclatureVersion": nomen.get("version"),
         "hfeMethod": hfe.get("method"),
         "frequencyLocation": md.get("frequencyLocation"),
+        "hfxID": md.get("hfxID"),
         "frequencyFileHeader": md.get("frequencyFileHeader"),
-        "checkSum": md.get("checkSum"),
         "license": md.get("license"),
         # QC fields
         **{f"qc_{k}": v for k, v in qc.items() if k != "warnings"},

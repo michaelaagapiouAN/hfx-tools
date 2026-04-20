@@ -1,47 +1,28 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "metadata": {
     "outputResolution": [
-      {
-        "locus": "A",
-        "resolution": "g"
-      },
-      {
-        "locus": "B",
-        "resolution": "g"
-      },
-      {
-        "locus": "C",
-        "resolution": "g"
-      },
-      {
-        "locus": "DRB1",
-        "resolution": "g"
-      },
-      {
-        "locus": "DQB1",
-        "resolution": "g"
-      }
+      { "locus": "A", "resolution": "g" },
+      { "locus": "B", "resolution": "g" },
+      { "locus": "C", "resolution": "g" },
+      { "locus": "DRB1", "resolution": "g" },
+      { "locus": "DQB1", "resolution": "g" }
     ],
     "hfeMethod": {
       "method": "EM",
       "parameters": [
-        {
-          "parameter": "iterations",
-          "value": "100"
-        }
+        { "parameter": "iterations", "value": "100" }
       ]
     },
     "cohortDescription": {
       "species": "Homo sapiens",
       "population": [
         {
-          "name": "CAU",
+          "name": "AFA",
           "geoLocation": {
-            "ISO3166": "US",
-            "subdivision": []
+            "ISO3166": "US"
           },
-          "populationSize": 38.6e6
+          "populationSize": 38600000
         }
       ],
       "cohortSize": 3156,
@@ -49,7 +30,6 @@
     },
     "nomenclatureUsed": {
       "database": "IPD-IMGT/HLA",
-      "group": "",
       "version": "2.16.0"
     },
     "producer": {
@@ -61,11 +41,10 @@
         "year": "2007"
       }
     },
-    "frequencyLocation": "file://data/HEGL_AFA.csv",
+    "frequencyLocation": "file://HEGL_AFA.csv",
     "frequencyFileHeader": {
       "Haplo": "haplotype",
       "Freq": "frequency"
-    },
-    "checkSum": "aaa61c62fbaa2de9d5f6064d2b635e5c"
+    }
   }
 }
