@@ -19,8 +19,6 @@ def main():
     p_pack = sub.add_parser("pack", help="Build a bundled .hfx archive (zip) from metadata.json")
     p_pack.add_argument("metadata_json", type=Path)
     p_pack.add_argument("-o", "--out", type=Path, required=True, help="Output .hfx path")
-    p_pack.add_argument("--normalize-data-path", action="store_true",
-                        help="Rewrite file://... to file://data/<basename> inside the archive")
     p_pack.add_argument("--manifest", action="store_true", help="Write MANIFEST.json into the archive")
     p_pack.add_argument("--hash", choices=["md5", "sha256"], default=None, help="Include checksums in manifest/SHA* file")
 
@@ -28,7 +26,7 @@ def main():
     p_qc = sub.add_parser("qc", help="Compute QC stats from an HFX submission JSON")
     p_qc.add_argument("metadata_json", type=Path)
     p_qc.add_argument("--write-metadata", action="store_true",
-                      help="Write computed QC into metadata.qc and update metadata.checkSum when applicable")
+                      help="Write computed QC stats into top-level hfx.qc")
     p_qc.add_argument("--index-row", action="store_true",
                       help="Print a flattened JSON row intended for phycus catalog/index")
     p_qc.add_argument("--topk", type=int, nargs="*", default=[10, 100, 1000], help="Top-K cutoffs for cumulative frequency")
@@ -53,7 +51,6 @@ def main():
         pack_hfx(
             metadata_json=args.metadata_json,
             out_path=args.out,
-            normalize_data_path=args.normalize_data_path,
             write_manifest=args.manifest,
             hash_alg=args.hash,
         )
@@ -74,7 +71,6 @@ def main():
             input_folder=args.input_folder,
             output_name=args.name,
             output_dir=args.out,
-            normalize_data_path=True,
             write_manifest=not args.no_manifest,
             hash_alg=hash_alg,
             auto_update_frequency_location=not args.no_auto_update_location,

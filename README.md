@@ -1,14 +1,11 @@
-## hfx-tools
-
-
 # hfx-tools
 
 Tools for working with HFX submissions (Haplotype Frequency Exchange).
 
-This repo provides composable command line tools and a Streamlit app for building, packing, 
+This repo provides composable command line tools and a Streamlit app for building, packing,
 inspecting, and validating HFX documents, implementing the [HFX specification](https://github.com/nmdp-bioinformatics/hfx). Key features include:
 
-- **`build`** - Build HFX bundles from a folder structure with automatic validation
+- **`build`** - Build HFX bundles from a folder with automatic validation
 - **`pack`** - Pack HFX archives from metadata.json with optional manifests and checksums
 - **`qc`** - Compute quality control statistics
 - **`inspect`** - Inspect metadata or bundled HFX files
@@ -18,9 +15,12 @@ inspecting, and validating HFX documents, implementing the [HFX specification](h
 ## Key schema facts
 
 - `metadata.frequencyLocation` controls where frequencies are stored: either `"inline"`
-  or a URI (e.g., `file://data/frequencies.csv`) (see [HFX specification](https://github.com/nmdp-bioinformatics/hfx)).
-  
+  or a URI (e.g., `file://frequencies.csv`) (see [HFX specification](https://github.com/nmdp-bioinformatics/hfx)).
+
 - If inline, the JSON may include `frequencyData` (array of `{haplotype, frequency}`).
+
+- `metadata.frequencyFileHeader` maps CSV column names to the expected `haplotype`/`frequency`
+  field names when the data file uses non-standard headers.
 
 ## Install
 
@@ -48,10 +48,10 @@ pip install -e ".[dev,lint]"
 **5-minute walkthrough** for the most common workflow:
 
 ```bash
-# 1. Create input folder with metadata and data
-mkdir -p my_submission/{metadata,data}
-cp my_metadata.json my_submission/metadata/metadata.json
-cp my_frequencies.csv my_submission/data/frequencies.csv
+# 1. Create input folder with metadata and data at top level
+mkdir my_submission
+cp my_metadata.json my_submission/
+cp my_frequencies.csv my_submission/
 
 # 2. Build and validate
 hfx-build my_submission -n my_hfx_file
@@ -100,39 +100,36 @@ The HFX standard supports four types of frequency data locations:
 
 1. **Inline** - `"frequencyLocation": "inline"` with `frequencyData` array in same JSON
 2. **Remote** - `"frequencyLocation": "https://zenodo.org/.../data.csv"` or S3 URL
-3. **File (relative)** - `"frequencyLocation": "file://data/frequencies.csv"` pointing to file within HFX bundle
-4. **File (parquet)** - Same as above but with `.parquet` extension
+3. **File (CSV)** - `"frequencyLocation": "file://frequencies.csv"` pointing to file within HFX bundle
+4. **File (Parquet)** - Same as above but with `.parquet` extension
 
 ### CLI: Build from folder
 
-The most common workflow for hackathons and batch processing:
+The most common workflow:
 
 ```bash
 hfx-build /path/to/input_folder -n output_name
 ```
 
-This will:
-1. Read metadata from `input_folder/metadata/`
-2. **Auto-detect** frequency data files in `input_folder/data/`
-3. **Auto-update** `metadata.frequencyLocation` to `file://data/<filename>` (unless already set to remote or inline)
-4. **Validate** all data with built-in validators
-5. **Pack** into a single `output_name.hfx` file (self-contained bundle with all data)
-6. **Log** all validation results to `output_name.build.log`
-
 Expected folder structure:
 ```
 input_folder/
-├── metadata/
-│   └── metadata.json      # Required: HFX metadata + inline data (optional)
-└── data/
-    └── frequencies.csv    # Optional: if frequencyLocation = "file://frequencies.csv"
+├── metadata.json      # Required: HFX metadata (optionally with inline frequencyData)
+└── frequencies.csv    # Optional: if frequencyLocation = "file://frequencies.csv"
 ```
+
+This will:
+1. Read `metadata.json` from `input_folder/`
+2. **Auto-detect** a frequency data file in the same folder
+3. **Auto-update** `metadata.frequencyLocation` to `file://<filename>` (unless already set to remote or inline)
+4. **Validate** all data with built-in validators
+5. **Pack** into a single `output_name.hfx` file
+6. **Log** all validation results to `output_name.build.log`
 
 Example:
 ```bash
-mkdir -p example/{metadata,data}
-cp metadata.json example/metadata/
-cp frequencies.csv example/data/
+cp metadata.json example/
+cp frequencies.csv example/
 hfx-build example -n my_submission
 # Output: example/my_submission.hfx
 ```
@@ -143,57 +140,6 @@ Options:
 - `--no-manifest` - Skip MANIFEST.json in archive
 - `--hash {md5,sha256,none}` - Hash algorithm (default: sha256)
 - `--no-auto-update-location` - Don't auto-update `metadata.frequencyLocation` (advanced)
-
-### CLI: Build with multiple populations
-
-For submissions with multiple populations, use a flat naming scheme with a `POPULATIONS.json` manifest. This keeps the structure identical whether you have 1 or many populations:
-
-```
-input_folder/
-├── metadata/
-│   ├── pop1_metadata.json
-│   ├── pop2_metadata.json
-│   └── pop3_metadata.json
-├── data/
-│   ├── pop1_frequencies.csv
-│   ├── pop2_frequencies.csv
-│   └── pop3_frequencies.csv
-└── POPULATIONS.json
-```
-
-**POPULATIONS.json structure:**
-```json
-{
-  "populations": [
-    {
-      "id": "pop1",
-      "name": "Population 1",
-      "metadataFile": "pop1_metadata.json",
-      "frequencyFile": "pop1_frequencies.csv"
-    },
-    {
-      "id": "pop2",
-      "name": "Population 2",
-      "metadataFile": "pop2_metadata.json",
-      "frequencyFile": "pop2_frequencies.csv"
-    }
-  ]
-}
-```
-
-**Build command:**
-```bash
-hfx-build input_folder -n multi_population_submission
-# Generates: multi_population_submission.hfx (with POPULATIONS.json manifest)
-```
-
-The build process will:
-1. Read `POPULATIONS.json` to discover all populations
-2. Load each population's metadata and frequency data
-3. Validate each population independently
-4. Pack all into a single `.hfx` archive with the manifest
-
-**Note:** Using the flat naming scheme (`pop*_metadata.json`, `pop*_frequencies.csv`) allows for consistent file structure whether you have a single population or many. Even single-population submissions can use this pattern for consistency.
 
 ### CLI: Pack (low-level)
 
@@ -225,7 +171,7 @@ streamlit run hfx_tools/streamlit_app.py
 ```
 
 The Streamlit app provides:
-- **Folder browser** - Select local folders with metadata/ and data/ subdirectories
+- **Folder browser** - Select local folders containing metadata.json and data files
 - **File upload** - Upload metadata.json and data files directly
 - **Auto-update mode** - Automatically sets `metadata.frequencyLocation` to point to uploaded data
 - **Metadata preview** - View JSON structure and what will be auto-updated before building
@@ -237,23 +183,21 @@ The Streamlit app provides:
 
 The build process includes an extensible validation framework with built-in validators:
 
-1. **Metadata required fields** - Ensures `metadata.frequencyLocation` is present
-2. **Frequency location** - Validates frequency location format (inline, file://, http://)
-3. **Frequency data format** - Checks inline frequency data structure, types, and duplicates
-4. **File references** - Verifies that referenced data files exist
+1. **Schema version** - Ensures top-level `version` matches the current HFX schema (`0.1.1`)
+2. **Metadata required fields** - Checks `outputResolution`, `hfeMethod`, `cohortDescription`, `nomenclatureUsed`, `frequencyLocation`
+3. **Frequency location** - Validates frequency location format (inline, file://, http://)
+4. **Frequency data format** - Checks inline frequency data structure, types, and duplicates
+5. **File references** - Verifies that referenced data files exist
 
-Validation results are logged and returned with error/warning levels. The build fails if any 
+Validation results are logged and returned with error/warning levels. The build fails if any
 error-level validations fail.
 
-### Custom validators (for hackathon extensibility)
-
-Hackathon participants can register custom validators:
+### Custom validators
 
 ```python
 from hfx_tools.validators import ValidationFramework, ValidationResult
 
 def my_custom_validator(metadata_json, hfx_obj, data_folder):
-    # Your validation logic here
     return ValidationResult(
         validator_name="my_validator",
         passed=True,
@@ -267,9 +211,7 @@ validator_framework.register_validator("my_validator", my_custom_validator)
 
 ## Common Use Cases
 
-### Scenario 1: Batch submission from local folder
-
-Build and submit multiple HFX files from organized folders:
+### Scenario 1: Batch submission from local folders
 
 ```bash
 for dir in submissions/*/; do
@@ -283,19 +225,15 @@ Point to frequencies hosted on Zenodo or S3 without bundling:
 
 ```json
 {
-  "frequencyLocation": "https://zenodo.org/record/12345/files/data.csv",
-  ...
+  "frequencyLocation": "https://zenodo.org/record/12345/files/data.csv"
 }
 ```
 
-Build skips file detection and includes only the metadata:
 ```bash
 hfx-build my_submission -n my_file --no-auto-update-location
 ```
 
 ### Scenario 3: Inline small frequencies
-
-For small datasets, embed frequencies directly in JSON:
 
 ```json
 {
@@ -307,71 +245,34 @@ For small datasets, embed frequencies directly in JSON:
 }
 ```
 
-### Scenario 4: Multiple populations in one submission
+### Scenario 4: Non-standard CSV headers
 
-Combine data from multiple populations into a single HFX file:
+If your CSV uses column names other than `haplotype`/`frequency`, map them in metadata:
 
-```bash
-# Folder structure
-submission/
-├── metadata/
-│   ├── european_metadata.json
-│   ├── asian_metadata.json
-│   └── african_metadata.json
-├── data/
-│   ├── european_frequencies.csv
-│   ├── asian_frequencies.csv
-│   └── african_frequencies.csv
-└── POPULATIONS.json
-```
-
-**POPULATIONS.json:**
 ```json
 {
-  "populations": [
-    {
-      "id": "european",
-      "name": "European Population",
-      "metadataFile": "european_metadata.json",
-      "frequencyFile": "european_frequencies.csv"
-    },
-    {
-      "id": "asian",
-      "name": "Asian Population",
-      "metadataFile": "asian_metadata.json",
-      "frequencyFile": "asian_frequencies.csv"
-    },
-    {
-      "id": "african",
-      "name": "African Population",
-      "metadataFile": "african_metadata.json",
-      "frequencyFile": "african_frequencies.csv"
-    }
-  ]
+  "frequencyFileHeader": {
+    "Haplo": "haplotype",
+    "Freq": "frequency"
+  }
 }
-```
-
-**Build:**
-```bash
-hfx-build submission -n global_study
-# Output: global_study.hfx (contains all 3 populations)
 ```
 
 ### Scenario 5: Programmatic use in Python
 
 ```python
-from hfx_tools.build import build
+from hfx_tools.build import build_hfx_from_folder
 
-result = build(
+result = build_hfx_from_folder(
     input_folder="my_data/",
     output_name="my_submission",
     output_dir="dist/",
-    hash_algorithm="sha256",
-    include_manifest=True
+    hash_alg="sha256",
+    write_manifest=True,
 )
-print(f"Build {'succeeded' if result.success else 'failed'}")
-for validation in result.validations:
-    print(f"  {validation.level}: {validation.message}")
+print(f"Build {'succeeded' if result['success'] else 'failed'}")
+for v in result["validation_results"]:
+    print(f"  {v.level}: {v.message}")
 ```
 
 ## Developer API
@@ -381,73 +282,42 @@ for validation in result.validations:
 ```python
 from hfx_tools.validators import ValidationFramework, ValidationResult
 
-# Create framework
 validator = ValidationFramework()
 
-# Add custom validation
-def check_population_size(metadata_json, hfx_obj, data_folder):
-    pop_size = metadata_json.get("populationSize", 0)
-    if pop_size < 100:
+def check_cohort_size(metadata_json, hfx_obj, data_folder):
+    size = hfx_obj.get("metadata", {}).get("cohortDescription", {}).get("cohortSize", 0)
+    if size < 100:
         return ValidationResult(
-            validator_name="population_size",
+            validator_name="cohort_size",
             passed=False,
-            message=f"Population too small: {pop_size} < 100",
+            message=f"Cohort too small: {size} < 100",
             level="warning"
         )
     return ValidationResult(
-        validator_name="population_size",
+        validator_name="cohort_size",
         passed=True,
-        message=f"Population size OK: {pop_size}",
+        message=f"Cohort size OK: {size}",
         level="info"
     )
 
-validator.register_validator("population_size", check_population_size)
-
-# Run validations
-results = validator.validate(metadata, hfx, data_folder)
-```
-
-### Building programmatically
-
-```python
-from hfx_tools.build import build
-from hfx_tools.io import read_metadata_json
-
-# Load and modify metadata before building
-metadata = read_metadata_json("metadata.json")
-metadata["submissionNotes"] = "Added via script"
-
-# Build with custom settings
-result = build(
-    input_folder=".",
-    output_name="my_hfx",
-    hash_algorithm="sha256",
-    include_manifest=True
-)
-
-if not result.success:
-    print("Validation errors:")
-    for v in result.validations:
-        if v.level == "error":
-            print(f"  - {v.message}")
+validator.register_validator("cohort_size", check_cohort_size)
+results = validator.validate(metadata_path, hfx_obj, data_folder)
 ```
 
 ## Package contents
 
 ```
-.
+hfx_tools/
 ├── __init__.py
-├── build.py           # Build orchestration (NEW - hackathon MVP)
+├── build.py           # Build orchestration
 ├── cli.py             # Command-line interface
 ├── inspect.py         # HFX inspection tools
 ├── io.py              # JSON and file I/O
 ├── pack.py            # Low-level packing
 ├── qc.py              # Quality control
-├── streamlit_app.py   # Web UI (NEW - hackathon MVP)
+├── streamlit_app.py   # Web UI
 ├── util.py            # Utilities
-├── validators.py      # Validation framework (NEW - hackathon MVP)
-├── Makefile
-└── pyproject.toml
+└── validators.py      # Validation framework
 ```
 
 ## Development & Contributing
@@ -455,7 +325,6 @@ if not result.success:
 ### Development setup
 
 ```bash
-# Clone and install with dev dependencies
 git clone https://github.com/nmdp-bioinformatics/hfx-tools
 cd hfx-tools
 make sync EXTRAS="dev,lint"
@@ -470,13 +339,6 @@ make test      # Run test suite
 make build     # Build distribution
 ```
 
-### Project structure for contributors
-
-- **validators.py** - Add new validators here (see `ValidationResult` class)
-- **build.py** - Core build logic, add workflow features here
-- **cli.py** - Command-line entry points, add new commands here
-- **streamlit_app.py** - Web UI, add interactive features here
-
 ### Submitting changes
 
 1. Fork the repo
@@ -487,18 +349,16 @@ make build     # Build distribution
 
 ## Troubleshooting
 
-### Issue: "frequencyLocation not found"
+### Issue: "Missing required field: metadata.frequencyLocation"
 
-**Cause**: Metadata doesn't include the `frequencyLocation` field.
-
-**Solution**: Add to `metadata.json`:
+Add to your metadata.json:
 ```json
 {
-  "frequencyLocation": "file://data/frequencies.csv"
+  "frequencyLocation": "file://frequencies.csv"
 }
 ```
 
-Or use inline frequencies if no external file:
+Or for inline data:
 ```json
 {
   "frequencyLocation": "inline",
@@ -508,65 +368,37 @@ Or use inline frequencies if no external file:
 
 ### Issue: Validation errors but can't see why
 
-**Solution**: Check the build log:
 ```bash
 hfx-build my_data -n output
-cat my_data/output.build.log    # Detailed validation results
+cat my_data/output.build.log
 ```
 
 ### Issue: File not found in bundle
 
-**Cause**: Data file exists but `metadata.frequencyLocation` points to wrong path.
-
-**Solution**: Ensure relative paths match structure:
+Ensure the filename in `frequencyLocation` matches the actual file in your folder:
 ```
 my_data/
-├── metadata/
-│   └── metadata.json    # with frequencyLocation: "file://data/my_file.csv"
-└── data/
-    └── my_file.csv      # ← matches the path
+├── metadata.json    # frequencyLocation: "file://my_file.csv"
+└── my_file.csv      # ← must match
+```
+
+### Issue: CSV columns not recognized
+
+Add `frequencyFileHeader` to your metadata to map your column names:
+```json
+{
+  "frequencyFileHeader": {
+    "Haplo": "haplotype",
+    "Freq": "frequency"
+  }
+}
 ```
 
 ### Issue: Permission denied when creating .venv
 
-**Solution**: Ensure write permission to directory:
 ```bash
 mkdir -p ~/.hfx-tools
 make sync VENV=~/.hfx-tools/.venv
-```
-
-### Issue: POPULATIONS.json not recognized
-
-**Cause**: File is missing, malformed, or in the wrong location.
-
-**Solution**: Ensure `POPULATIONS.json` is at the root of input folder (same level as `metadata/` and `data/`):
-```
-input_folder/
-├── POPULATIONS.json         # ← Must be here
-├── metadata/
-└── data/
-```
-
-Validate JSON syntax:
-```bash
-python -m json.tool input_folder/POPULATIONS.json
-```
-
-### Issue: Population metadata mismatch
-
-**Cause**: `POPULATIONS.json` references files that don't exist in `metadata/` or `data/`.
-
-**Solution**: Check that filenames match exactly:
-```json
-{
-  "populations": [
-    {
-      "id": "pop1",
-      "metadataFile": "pop1_metadata.json",    # ← Must exist in metadata/
-      "frequencyFile": "pop1_frequencies.csv"  # ← Must exist in data/
-    }
-  ]
-}
 ```
 
 ## Resources
@@ -575,6 +407,3 @@ python -m json.tool input_folder/POPULATIONS.json
 - [phycus](https://github.com/nmdp-bioinformatics/phycus) - Related NMDP bioinformatics tools
 - [Issues & Discussions](https://github.com/nmdp-bioinformatics/hfx-tools/issues) - Report bugs or suggest features
 - [HFX Spec Issues](https://github.com/nmdp-bioinformatics/hfx/issues) - Discuss spec-related questions
-
-
-

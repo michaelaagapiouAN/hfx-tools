@@ -19,13 +19,15 @@ ifeq ($(FROZEN),1)
   UV_SYNC_FLAGS += --frozen
 endif
 
-.PHONY: help venv sync sync-parquet lock fmt lint test build clean distclean ci
+.PHONY: help venv sync sync-parquet sync-streamlit lock fmt lint test build clean distclean ci streamlit activate
 
 help:
 	@echo "Targets:"
 	@echo "  venv            Create .venv (uv venv)"
 	@echo "  sync            Install deps into .venv (uv sync)"
-	@echo "  sync-parquet    Install deps + parquet extra"
+	@echo "  activate        Print the activate command for this venv (usage: eval \$$(make activate))"
+	@echo "  sync-streamlit  Install deps + streamlit extra"
+	@echo "  streamlit       Launch the Streamlit web UI"
 	@echo "  lock            Generate/refresh uv.lock"
 	@echo "  fmt             Format code (ruff format)"
 	@echo "  lint            Lint code (ruff check)"
@@ -45,6 +47,15 @@ sync: venv
 
 sync-parquet:
 	$(MAKE) sync EXTRAS="parquet"
+
+activate:
+	@echo 'source $(CURDIR)/$(VENV)/bin/activate'
+
+sync-streamlit:
+	$(MAKE) sync EXTRAS="streamlit"
+
+streamlit: sync-streamlit
+	uv run streamlit run hfx_tools/streamlit_app.py
 
 # Create or update uv.lock
 lock:

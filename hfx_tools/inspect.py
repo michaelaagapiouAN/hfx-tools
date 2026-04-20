@@ -21,9 +21,10 @@ def _print_summary(hfx: Dict[str, Any], label: str) -> None:
     print(f"== {label} ==")
     print(f"version: {version}")
     print(f"frequencyLocation: {md.get('frequencyLocation')}")
+    if md.get("hfxID"):
+        print(f"hfxID: {md.get('hfxID')}")
     if md.get("frequencyFileHeader"):
         print(f"frequencyFileHeader: {md.get('frequencyFileHeader')}")
-    print(f"checkSum (md5): {md.get('checkSum')}")
     print(f"species: {cohort.get('species')}")
     print(f"cohortSize: {cohort.get('cohortSize')}")
     print(f"populations: {pop_names}")

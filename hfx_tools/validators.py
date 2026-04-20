@@ -89,7 +89,7 @@ class ValidationFramework:
 
 # Built-in validators
 
-HFX_SCHEMA_VERSION = "0.1.0"
+HFX_SCHEMA_VERSION = "0.1.1"
 
 
 def validate_schema_version(metadata_json: Path, hfx_obj: Dict[str, Any],
@@ -294,8 +294,7 @@ def validate_file_references(metadata_json: Path, hfx_obj: Dict[str, Any],
     # Extract relative path from file://...
     rel_path = freq_loc[7:]  # Remove "file://"
     file_path = data_folder / rel_path
-    
-    # First try exact path
+
     if file_path.exists():
         return ValidationResult(
             validator_name="file_references",
@@ -303,20 +302,17 @@ def validate_file_references(metadata_json: Path, hfx_obj: Dict[str, Any],
             message=f"File reference valid: {file_path}",
             level="info"
         )
-    
-    # If exact path doesn't exist, try to find the file in data_folder
-    # (in case filename was different but only one data file exists)
+
+    # Fall back: look for any matching data file in the folder
     if data_folder.exists():
-        data_files = list(data_folder.glob("*"))
-        data_files = [f for f in data_files if f.is_file()]
-        
+        data_files = [f for f in data_folder.glob("*")
+                      if f.is_file() and f.suffix.lower() in (".csv", ".parquet")]
+
         if len(data_files) == 1:
-            # Only one file in data folder, use it
-            actual_file = data_files[0]
             return ValidationResult(
                 validator_name="file_references",
                 passed=True,
-                message=f"File found (using {actual_file.name} instead of {rel_path})",
+                message=f"File found (using {data_files[0].name} instead of {rel_path})",
                 level="warning"
             )
         elif len(data_files) > 1:
@@ -324,7 +320,7 @@ def validate_file_references(metadata_json: Path, hfx_obj: Dict[str, Any],
             return ValidationResult(
                 validator_name="file_references",
                 passed=False,
-                message=f"Multiple files in data folder but none match '{rel_path}'. Available: {available}. Make sure uploaded filename matches metadata reference.",
+                message=f"Multiple data files but none match '{rel_path}'. Available: {available}",
                 level="error"
             )
     

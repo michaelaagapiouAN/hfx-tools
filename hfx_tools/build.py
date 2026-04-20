@@ -16,33 +16,25 @@ def build_hfx_from_folder(
     input_folder: Path,
     output_name: str,
     output_dir: Optional[Path] = None,
-    normalize_data_path: bool = True,
     write_manifest: bool = True,
     hash_alg: str = "sha256",
     auto_update_frequency_location: bool = True,
 ) -> Dict[str, Any]:
-    """Build an HFX bundle from a folder structure.
-    
+    """Build an HFX bundle from a folder.
+
     Expected folder structure:
         input_folder/
-        ├── metadata/
-        │   └── metadata.json (or multiple metadata files)
-        └── data/
-            └── frequency_file.csv or .parquet (optional if inline)
-    
-    If a data file is found and auto_update_frequency_location is True,
-    the metadata.frequencyLocation will be updated to point to the file
-    location within the wheel (e.g., "file://data/myfile.csv").
-    
+        ├── metadata.json          # Required
+        └── frequencies.csv        # Optional if frequencyLocation is inline or remote
+
     Args:
-        input_folder: Root folder containing metadata/ and data/ subdirectories
+        input_folder: Folder containing metadata JSON and optional data files
         output_name: Name for output .hfx file (without extension)
         output_dir: Where to write the .hfx file (defaults to input_folder)
-        normalize_data_path: Rewrite file:// paths inside archive
         write_manifest: Include MANIFEST.json in archive
         hash_alg: Hash algorithm for manifest ("md5", "sha256", or None)
-        auto_update_frequency_location: Auto-update metadata to point to data files
-    
+        auto_update_frequency_location: Auto-update metadata to point to detected data file
+
     Returns:
         Dictionary with build results including validation results and output path
     """
@@ -66,65 +58,51 @@ def build_hfx_from_folder(
     
     logger.info(f"Starting HFX build: {output_name}")
     logger.info(f"Input folder: {input_folder}")
-    
-    # Validate structure
-    metadata_folder = input_folder / "metadata"
-    data_folder = input_folder / "data"
-    
-    if not metadata_folder.exists():
-        logger.error(f"metadata/ folder not found: {metadata_folder}")
-        raise FileNotFoundError(f"metadata/ folder not found: {metadata_folder}")
-    
-    # Discover metadata files
-    metadata_files = list(metadata_folder.glob("*.json"))
+
+    # Discover metadata file (single .json at top level, excluding known non-metadata names)
+    metadata_files = [f for f in input_folder.glob("*.json")
+                      if f.name not in ("MANIFEST.json",)]
     if not metadata_files:
-        logger.error(f"No JSON files found in metadata/: {metadata_folder}")
-        raise FileNotFoundError(f"No JSON files found in metadata/: {metadata_folder}")
-    
-    logger.info(f"Found {len(metadata_files)} metadata file(s)")
-    
-    # For MVP: assume single metadata file
+        raise FileNotFoundError(f"No JSON metadata file found in: {input_folder}")
     if len(metadata_files) > 1:
-        logger.warning(f"Found {len(metadata_files)} metadata files; using first one: {metadata_files[0]}")
-    
+        logger.warning(f"Found {len(metadata_files)} JSON files; using first: {metadata_files[0]}")
+
     metadata_json = metadata_files[0]
     logger.info(f"Using metadata file: {metadata_json}")
+
+    # Discover data files (non-JSON files at top level)
+    data_files = [f for f in input_folder.glob("*")
+                  if f.is_file() and f.suffix.lower() in (".csv", ".parquet")]
     
     # Load and validate
     hfx_obj = read_hfx_json(metadata_json)
 
     # Ensure top-level version is set per schema
     if "version" not in hfx_obj:
-        hfx_obj["version"] = "0.1.0"
-        logger.info("Added missing top-level version: 0.1.0")
+        hfx_obj["version"] = "0.1.1"
+        logger.info("Added missing top-level version: 0.1.1")
 
     # Ensure metadata wrapper exists
     if "metadata" not in hfx_obj:
         hfx_obj["metadata"] = {}
         logger.warning("Added missing metadata wrapper")
     
-    # Auto-detect and update frequency location if data files exist
-    if auto_update_frequency_location and data_folder.exists():
-        data_files = [f for f in data_folder.glob("*") if f.is_file()]
-        if data_files and len(data_files) == 1:
+    # Auto-detect and update frequency location
+    if auto_update_frequency_location and data_files:
+        if len(data_files) == 1:
             data_file = data_files[0]
             freq_loc = hfx_obj.get("metadata", {}).get("frequencyLocation", "")
-            
-            # Only auto-update if:
-            # 1. Not already set to remote (http/https)
-            # 2. Not already set to inline
-            # 3. Not already set to a file:// reference
             if not freq_loc or (freq_loc != "inline" and not freq_loc.startswith("http")):
-                old_loc = freq_loc
-                new_loc = f"file://data/{data_file.name}"
-                logger.info(f"Auto-updating frequencyLocation from '{old_loc}' to '{new_loc}'")
+                new_loc = f"file://{data_file.name}"
+                logger.info(f"Auto-updating frequencyLocation to '{new_loc}'")
                 hfx_obj["metadata"]["frequencyLocation"] = new_loc
-                # Write updated metadata back to file so pack_hfx reads it
                 write_hfx_json(metadata_json, hfx_obj)
-    
+        else:
+            logger.warning(f"Found {len(data_files)} data files; skipping auto-update")
+
     # Run validation
     validator = ValidationFramework()
-    validation_results = validator.validate(metadata_json, hfx_obj, data_folder)
+    validation_results = validator.validate(metadata_json, hfx_obj, input_folder)
     
     # Log validation results
     logger.info("--- Validation Results ---")
@@ -149,7 +127,6 @@ def build_hfx_from_folder(
         pack_hfx(
             metadata_json=metadata_json,
             out_path=output_path,
-            normalize_data_path=normalize_data_path,
             write_manifest=write_manifest,
             hash_alg=hash_alg,
         )
